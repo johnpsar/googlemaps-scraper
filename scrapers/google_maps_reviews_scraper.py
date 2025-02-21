@@ -44,17 +44,25 @@ class GoogleMapsReviewsScraper(GoogleMapsBaseScraper):
         self._scroll()
         time.sleep(4)
         self._expand_reviews()
-
+        self._show_original_reviews()
         response = BeautifulSoup(self.driver.page_source, 'html.parser')
-        rblock = response.find_all('div', class_='jftiEf fontBodyMedium')
+        review_blocks = response.find_all(
+            'div', class_='jftiEf fontBodyMedium')
 
         parsed_reviews = []
-        for index, review in enumerate(rblock):
+        for index, review in enumerate(review_blocks):
             if index >= offset:
+                print("index", index)
                 r = self._parse_review(review)
                 parsed_reviews.append(r)
 
         return parsed_reviews
+
+    def _show_original_reviews(self):
+        translate_buttons = self.driver.find_elements(
+            "xpath", "//button[contains(@class, 'kyuRq') and .//span[contains(text(), 'See original')]]")
+        for button in translate_buttons:
+            self.driver.execute_script("arguments[0].click();", button)
 
     def _parse_review(self, review):
         return {

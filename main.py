@@ -6,7 +6,7 @@ def main():
     url = f"https://www.google.com/maps/place/?q=place_id:{place_id}"
     print("Fetching reviews for url:", url)
     # Use the scraper within a context manager
-    with ReviewsFetcher(debug=False) as scraper:
+    with ReviewsFetcher(debug=True) as scraper:
         # Get reviews
         reviews = scraper.get_reviews(
             url=url,
