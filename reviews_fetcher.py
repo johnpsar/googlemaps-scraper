@@ -18,13 +18,14 @@ class SortBy(Enum):
 @dataclass
 class Review:
     id_review: str
-    caption: str
-    relative_date: str
-    retrieval_date: str
+    content: str
+    submitted_at: str
     rating: int
     username: str
     n_review_user: int
-    # n_photo_user: int
+    avatar: str
+    reply_content: str
+    reply_date: str
     url_user: str
     source_url: Optional[str] = None
 
@@ -85,13 +86,14 @@ class ReviewsFetcher:
             for review_dict in batch:
                 review = Review(
                     id_review=review_dict['id_review'],
-                    caption=review_dict['caption'],
-                    relative_date=review_dict['relative_date'],
-                    retrieval_date=review_dict['retrieval_date'],
+                    content=review_dict['content'],
+                    submitted_at=review_dict['submitted_at'],
                     rating=review_dict['rating'],
                     username=review_dict['username'],
                     n_review_user=review_dict['n_review_user'],
-                    # n_photo_user=review_dict['n_photo_user'],
+                    avatar=review_dict['avatar'],
+                    reply_content=review_dict['reply_content'],
+                    reply_date=review_dict['reply_date'],
                     url_user=review_dict['url_user'],
                     source_url=url
                 )

@@ -65,13 +65,16 @@ class GoogleMapsReviewsScraper(GoogleMapsBaseScraper):
             self.driver.execute_script("arguments[0].click();", button)
 
     def _parse_review(self, review):
+
         return {
             'id_review': review.get('data-review-id'),
-            'caption': self._get_review_text(review),
-            'relative_date': self._get_relative_date(review),
-            'retrieval_date': datetime.now(),
+            'content': self._get_review_text(review),
+            'submitted_at': datetime.now(),
             'rating': self._get_rating(review),
             'username': review.get('aria-label'),
+            'avatar': self._get_avatar(review),
+            'reply_content': self._get_reply_content(review),
+            'reply_date': self._get_reply_date(review),
             'n_review_user': self._get_n_reviews(review),
             'url_user': self._get_user_url(review)
         }
@@ -102,6 +105,36 @@ class GoogleMapsReviewsScraper(GoogleMapsBaseScraper):
     def _get_relative_date(self, review):
         try:
             return review.find('span', class_='rsqaWe').text
+        except:
+            return None
+
+    def _get_reply_content(self, review):
+        try:
+            reply_div = review.find('div', class_='wiI7pd', lang='el')
+            if reply_div and reply_div.parent.find('span', class_='nM6d2c'):
+                return reply_div.text.strip()
+            return None
+        except:
+            return None
+
+    def _get_reply_date(self, review):
+        try:
+            date_span = review.find('span', class_='DZSIDd')
+            if date_span:
+                return date_span.text.strip()
+            return None
+        except:
+            return None
+
+    def _get_avatar(self, review):
+        try:
+            avatar_img = review.find('img', class_='NBa7we')
+            if avatar_img:
+                img_src = avatar_img['src']
+                img_src_cleaned = img_src.rsplit('=', 1)[0]
+                return img_src_cleaned
+
+            return None
         except:
             return None
 
