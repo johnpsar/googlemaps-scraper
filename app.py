@@ -44,8 +44,8 @@ def fetch_reviews():
         # Input validation
         if not place_id:
             return jsonify({'error': 'place_id is required'}), 400
-        if max_reviews < 1 or max_reviews > 100:
-            return jsonify({'error': 'max_reviews must be between 1 and 100'}), 400
+        if max_reviews < 1 or max_reviews > 1000:
+            return jsonify({'error': 'max_reviews must be between 1 and 1000'}), 400
 
         app.logger.info(
             f'Fetching reviews for place_id: {place_id}, max_reviews: {max_reviews}')

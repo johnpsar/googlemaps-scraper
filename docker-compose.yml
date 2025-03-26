@@ -15,13 +15,13 @@ services:
       - FLASK_APP=app.py
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1
-      - GUNICORN_CMD_ARGS="--workers=1 --timeout=300 --max-requests=50 --max-requests-jitter=10"
+      - GUNICORN_CMD_ARGS=--workers=3 --timeout=300 --max-requests=50 --max-requests-jitter=10
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 6G
         reservations:
-          memory: 1G
+          memory: 3G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/fetch-reviews?place_id=ChIJ_5LxRO2ZoRQRE1Q7-KhVZpM"]
       interval: 30s
