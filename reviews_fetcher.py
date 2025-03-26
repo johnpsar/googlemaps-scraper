@@ -76,11 +76,12 @@ class ReviewsFetcher:
             return reviews
 
         processed_reviews = 0
+        start_index = 0
         while processed_reviews < max_reviews:
             logger.info(
-                f"Fetching reviews {processed_reviews + 1} to {processed_reviews + 10}")
+                f"Fetching reviews starting at index {start_index}")
 
-            batch = self.scraper.get_reviews(processed_reviews)
+            batch = self.scraper.get_reviews(start_index)
             if not batch:
                 logger.info("No more reviews available")
                 break
@@ -113,6 +114,8 @@ class ReviewsFetcher:
                     seen_reviews.add((review.content, review.username))
                     reviews.append(review)
                     processed_reviews += 1
+
+            start_index += 1
 
         return reviews
 
