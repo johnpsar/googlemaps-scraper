@@ -97,9 +97,9 @@ class ReviewsFetcher:
                     url_user=review_dict['url_user'],
                     source_url=url
                 )
-                reviews.append(review)
-
-            processed_reviews += len(batch)
+                if (review.content is not None):
+                    reviews.append(review)
+                    processed_reviews += 1
 
         return reviews
 

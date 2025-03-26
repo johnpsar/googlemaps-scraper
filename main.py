@@ -17,10 +17,11 @@ def main():
         # Print results
         print(f"Found {len(reviews)} reviews:")
         for review in reviews:
+            print(review)
             print(f"\nReview by {review.username}")
             print(f"Rating: {review.rating}/5")
-            print(f"Comment: {review.caption}")
-            print(f"Date: {review.relative_date}")
+            print(f"Comment: {review.content}")
+            print(f"Date: {review.submitted_at}")
 
 
 if __name__ == "__main__":

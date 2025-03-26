@@ -6,6 +6,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 from .google_maps_base_scraper import GoogleMapsBaseScraper
+import re
+from datetime import datetime, timedelta
 
 
 class GoogleMapsReviewsScraper(GoogleMapsBaseScraper):
@@ -65,19 +67,101 @@ class GoogleMapsReviewsScraper(GoogleMapsBaseScraper):
             self.driver.execute_script("arguments[0].click();", button)
 
     def _parse_review(self, review):
+        relative_date = self._get_relative_date(review)
+        submitted_at = self._convert_relative_date_to_timestamp(
+            relative_date) if relative_date else datetime.now()
+
+        relative_reply_date = self._get_reply_date(review)
+        reply_date = self._convert_relative_date_to_timestamp(
+            relative_reply_date) if relative_reply_date else None
 
         return {
             'id_review': review.get('data-review-id'),
             'content': self._get_review_text(review),
-            'submitted_at': datetime.now(),
+            'submitted_at': submitted_at,
             'rating': self._get_rating(review),
             'username': review.get('aria-label'),
             'avatar': self._get_avatar(review),
             'reply_content': self._get_reply_content(review),
-            'reply_date': self._get_reply_date(review),
+            'reply_date': reply_date,
             'n_review_user': self._get_n_reviews(review),
             'url_user': self._get_user_url(review)
         }
+
+    def _convert_relative_date_to_timestamp(self, relative_date):
+        """
+        Convert Google Maps relative date format to a timestamp.
+
+        Args:
+            relative_date (str): Date in Google Maps format (e.g., "2 days ago", "A month ago")
+
+        Returns:
+            datetime: Approximate timestamp based on the relative date
+        """
+        now = datetime.now()
+
+        if not relative_date:
+            return now
+
+        relative_date = relative_date.lower().strip()
+
+        # Just now or very recent
+        if relative_date == "just now" or relative_date == "5 minutes ago" or relative_date == "30 minutes ago":
+            return now
+
+        # Hours ago
+        if "hour" in relative_date:
+            hours = 1
+            if "an hour" not in relative_date:
+                try:
+                    hours = int(re.search(r'(\d+)', relative_date).group(1))
+                except (AttributeError, ValueError):
+                    return now
+            return now - timedelta(hours=hours)
+
+        # Days ago
+        if "day" in relative_date:
+            days = 1
+            if "a day" not in relative_date:
+                try:
+                    days = int(re.search(r'(\d+)', relative_date).group(1))
+                except (AttributeError, ValueError):
+                    return now
+            return now - timedelta(days=days)
+
+        # Weeks ago
+        if "week" in relative_date:
+            weeks = 1
+            if "a week" not in relative_date:
+                try:
+                    weeks = int(re.search(r'(\d+)', relative_date).group(1))
+                except (AttributeError, ValueError):
+                    return now
+            return now - timedelta(weeks=weeks)
+
+        # Months ago
+        if "month" in relative_date:
+            months = 1
+            if "a month" not in relative_date:
+                try:
+                    months = int(re.search(r'(\d+)', relative_date).group(1))
+                except (AttributeError, ValueError):
+                    return now
+            # Approximate a month as 30 days
+            return now - timedelta(days=30*months)
+
+        # Years ago
+        if "year" in relative_date:
+            years = 1
+            if "a year" not in relative_date:
+                try:
+                    years = int(re.search(r'(\d+)', relative_date).group(1))
+                except (AttributeError, ValueError):
+                    return now
+            # Approximate a year as 365 days
+            return now - timedelta(days=365*years)
+
+        return now
 
     def _scroll(self):
         scrollable_div = self.driver.find_element(
