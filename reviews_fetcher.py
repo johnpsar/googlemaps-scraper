@@ -45,9 +45,8 @@ class ReviewsFetcher:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-        # if self.scraper:
-        # self.scraper.close()
+        if self.scraper:
+            self.scraper.close()
 
     def get_reviews(self,
                     url: str,
@@ -77,9 +76,15 @@ class ReviewsFetcher:
 
         processed_reviews = 0
         start_index = 0
+        seen_indices = set()
+
         while processed_reviews < max_reviews:
-            logger.info(
-                f"Fetching reviews starting at index {start_index}")
+            logger.info(f"Fetching reviews starting at index {start_index}")
+
+            if start_index in seen_indices:
+                logger.info("Detected index loop, ending review collection")
+                break
+            seen_indices.add(start_index)
 
             batch = self.scraper.get_reviews(start_index)
             if not batch:
@@ -110,7 +115,7 @@ class ReviewsFetcher:
                     url_user=review_dict['url_user'],
                     source_url=url
                 )
-                if (review.content is not None):
+                if review.content is not None:
                     seen_reviews.add((review.content, review.username))
                     reviews.append(review)
                     processed_reviews += 1
