@@ -68,6 +68,7 @@ class ReviewsFetcher:
             raise RuntimeError("Scraper must be used within a context manager")
 
         reviews = []
+        seen_review_ids = set()
         error = self.scraper.sort_by(url, sort_by.value)
 
         if error != 0:
@@ -81,9 +82,19 @@ class ReviewsFetcher:
 
             batch = self.scraper.get_reviews(processed_reviews)
             if not batch:
+                logger.info("No more reviews available")
                 break
 
             for review_dict in batch:
+                if processed_reviews >= max_reviews:
+                    break
+
+                # Check if we've seen this review before
+                if review_dict['id_review'] in seen_review_ids:
+                    logger.info(
+                        "Duplicate review found, ending review collection")
+                    return reviews
+
                 review = Review(
                     id_review=review_dict['id_review'],
                     content=review_dict['content'],
@@ -98,6 +109,7 @@ class ReviewsFetcher:
                     source_url=url
                 )
                 if (review.content is not None):
+                    seen_review_ids.add(review.id_review)
                     reviews.append(review)
                     processed_reviews += 1
 
