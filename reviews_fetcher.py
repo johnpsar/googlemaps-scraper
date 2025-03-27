@@ -45,9 +45,9 @@ class ReviewsFetcher:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-        # if self.scraper:
-        # self.scraper.close()
+        if self.scraper:
+            self.scraper.cleanup()
+            self.scraper = None
 
     def get_reviews(self,
                     url: str,
