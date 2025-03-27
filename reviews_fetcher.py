@@ -69,53 +69,104 @@ class ReviewsFetcher:
 
         reviews = []
         seen_reviews = set()
-        error = self.scraper.sort_by(url, sort_by.value)
+        max_retries = 3
+        retry_count = 0
 
-        if error != 0:
-            logger.error(f"Failed to sort reviews: {error}")
-            return reviews
+        while retry_count < max_retries:
+            try:
+                error = self.scraper.sort_by(url, sort_by.value)
+                if error != 0:
+                    logger.error(f"Failed to sort reviews: {error}")
+                    return reviews
+                break
+            except Exception as e:
+                retry_count += 1
+                logger.error(
+                    f"Error during sort_by (attempt {retry_count}/{max_retries}): {str(e)}")
+                if retry_count == max_retries:
+                    logger.error("Max retries reached for sort_by operation")
+                    return reviews
+                # Try to reinitialize the scraper
+                try:
+                    self.scraper.cleanup()
+                    self.scraper = GoogleMapsReviewsScraper(debug=self.debug)
+                except Exception as cleanup_error:
+                    logger.error(
+                        f"Error during scraper reinitialization: {str(cleanup_error)}")
+                    return reviews
 
         processed_reviews = 0
         start_index = 0
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+
         while processed_reviews < max_reviews:
-            logger.info(
-                f"Fetching reviews starting at index {start_index}")
+            try:
+                logger.info(
+                    f"Fetching reviews starting at index {start_index}")
 
-            batch = self.scraper.get_reviews(start_index)
-            if not batch:
-                logger.info("No more reviews available")
-                break
-
-            for review_dict in batch:
-                if processed_reviews >= max_reviews:
+                batch = self.scraper.get_reviews(start_index)
+                if not batch:
+                    logger.info("No more reviews available")
                     break
 
-                # Check if we've seen this review content + username combination before
-                review_key = (review_dict['content'], review_dict['username'])
-                if review_key in seen_reviews:
-                    logger.info(
-                        "Duplicate review found, ending review collection")
-                    return reviews
+                consecutive_failures = 0  # Reset on successful batch
+                for review_dict in batch:
+                    if processed_reviews >= max_reviews:
+                        break
 
-                review = Review(
-                    id_review=review_dict['id_review'],
-                    content=review_dict['content'],
-                    submitted_at=review_dict['submitted_at'],
-                    rating=review_dict['rating'],
-                    username=review_dict['username'],
-                    n_review_user=review_dict['n_review_user'],
-                    avatar=review_dict['avatar'],
-                    reply_content=review_dict['reply_content'],
-                    reply_date=review_dict['reply_date'],
-                    url_user=review_dict['url_user'],
-                    source_url=url
-                )
-                if (review.content is not None):
-                    seen_reviews.add((review.content, review.username))
-                    reviews.append(review)
-                    processed_reviews += 1
+                    # Check if we've seen this review content + username combination before
+                    review_key = (review_dict['content'],
+                                  review_dict['username'])
+                    if review_key in seen_reviews:
+                        logger.info(
+                            "Duplicate review found, ending review collection")
+                        return reviews
 
-                start_index += 1
+                    review = Review(
+                        id_review=review_dict['id_review'],
+                        content=review_dict['content'],
+                        submitted_at=review_dict['submitted_at'],
+                        rating=review_dict['rating'],
+                        username=review_dict['username'],
+                        n_review_user=review_dict['n_review_user'],
+                        avatar=review_dict['avatar'],
+                        reply_content=review_dict['reply_content'],
+                        reply_date=review_dict['reply_date'],
+                        url_user=review_dict['url_user'],
+                        source_url=url
+                    )
+                    if (review.content is not None):
+                        seen_reviews.add((review.content, review.username))
+                        reviews.append(review)
+                        processed_reviews += 1
+
+                    start_index += 1
+
+            except Exception as e:
+                consecutive_failures += 1
+                logger.error(
+                    f"Error fetching reviews (attempt {consecutive_failures}/{max_consecutive_failures}): {str(e)}")
+
+                if consecutive_failures >= max_consecutive_failures:
+                    logger.error(
+                        "Max consecutive failures reached, stopping review collection")
+                    break
+
+                # Try to reinitialize the scraper
+                try:
+                    self.scraper.cleanup()
+                    self.scraper = GoogleMapsReviewsScraper(debug=self.debug)
+                    # Retry the sort operation
+                    error = self.scraper.sort_by(url, sort_by.value)
+                    if error != 0:
+                        logger.error(
+                            "Failed to re-sort reviews after reinitialization")
+                        break
+                except Exception as cleanup_error:
+                    logger.error(
+                        f"Error during scraper reinitialization: {str(cleanup_error)}")
+                    break
 
         return reviews
 
@@ -132,4 +183,26 @@ class ReviewsFetcher:
         if not self.scraper:
             raise RuntimeError("Scraper must be used within a context manager")
 
-        return self.scraper.get_account(url)
+        max_retries = 3
+        retry_count = 0
+
+        while retry_count < max_retries:
+            try:
+                return self.scraper.get_account(url)
+            except Exception as e:
+                retry_count += 1
+                logger.error(
+                    f"Error getting place metadata (attempt {retry_count}/{max_retries}): {str(e)}")
+
+                if retry_count == max_retries:
+                    logger.error("Max retries reached for get_place_metadata")
+                    raise
+
+                # Try to reinitialize the scraper
+                try:
+                    self.scraper.cleanup()
+                    self.scraper = GoogleMapsReviewsScraper(debug=self.debug)
+                except Exception as cleanup_error:
+                    logger.error(
+                        f"Error during scraper reinitialization: {str(cleanup_error)}")
+                    raise

@@ -4,6 +4,10 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import time
+import signal
+import sys
+from datetime import datetime
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
@@ -53,51 +57,101 @@ def fetch_reviews():
         # Construct the URL
         url = f"https://www.google.com/maps/place/?q=place_id:{place_id}"
 
-        # Fetch reviews using the scraper
-        with ReviewsFetcher(debug=False) as scraper:
-            reviews = scraper.get_reviews(
-                url=url,
-                sort_by=SortBy.NEWEST,
-                max_reviews=max_reviews
-            )
+        # Fetch reviews using the scraper with retries
+        max_retries = 3
+        retry_count = 0
+        last_error = None
 
-            # Convert reviews to dictionary format
-            reviews_data = []
-            for review in reviews:
-                reviews_data.append({
-                    'id': review.id_review,
-                    'content': review.content,
-                    'submitted_at': review.submitted_at,
-                    'rating': review.rating,
-                    'username': review.username,
-                    'avatar': review.avatar,
-                    'reply_content': review.reply_content,
-                    'reply_date': review.reply_date,
-                    'n_review_user': review.n_review_user,
-                    'url_user': review.url_user,
-                })
+        while retry_count < max_retries:
+            try:
+                with ReviewsFetcher(debug=False) as scraper:
+                    reviews = scraper.get_reviews(
+                        url=url,
+                        sort_by=SortBy.NEWEST,
+                        max_reviews=max_reviews
+                    )
 
-            review_with_text = [
-                review for review in reviews_data if review['content'] is not None]
+                    # Convert reviews to dictionary format
+                    reviews_data = []
+                    for review in reviews:
+                        reviews_data.append({
+                            'id': review.id_review,
+                            'content': review.content,
+                            'submitted_at': review.submitted_at,
+                            'rating': review.rating,
+                            'username': review.username,
+                            'avatar': review.avatar,
+                            'reply_content': review.reply_content,
+                            'reply_date': review.reply_date,
+                            'n_review_user': review.n_review_user,
+                            'url_user': review.url_user,
+                        })
 
-            app.logger.info(
-                f'Successfully fetched {len(reviews_data)} reviews')
-            return jsonify({
-                'success': True,
-                'total_reviews': len(reviews_data),
-                'reviews': reviews_data,
-                'total_review_with_text': len(review_with_text),
-                'review_with_text': review_with_text
-            })
+                    review_with_text = [
+                        review for review in reviews_data if review['content'] is not None]
 
-    except Exception as e:
-        app.logger.error(f'Error fetching reviews: {str(e)}')
+                    app.logger.info(
+                        f'Successfully fetched {len(reviews_data)} reviews')
+                    return jsonify({
+                        'success': True,
+                        'total_reviews': len(reviews_data),
+                        'reviews': reviews_data,
+                        'total_review_with_text': len(review_with_text),
+                        'review_with_text': review_with_text
+                    })
+
+            except Exception as e:
+                retry_count += 1
+                last_error = str(e)
+                app.logger.error(
+                    f'Error fetching reviews (attempt {retry_count}/{max_retries}): {last_error}')
+
+                if retry_count == max_retries:
+                    app.logger.error(
+                        'Max retries reached for fetching reviews')
+                    return jsonify({
+                        'success': False,
+                        'error': f'Failed to fetch reviews after {max_retries} attempts. Last error: {last_error}'
+                    }), 500
+
+                # Wait before retrying
+                time.sleep(2 * retry_count)  # Exponential backoff
+
         return jsonify({
             'success': False,
-            'error': 'An error occurred while fetching reviews'
+            'error': 'An unexpected error occurred while fetching reviews'
         }), 500
+
+    except Exception as e:
+        app.logger.error(f'Unexpected error in fetch_reviews: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': 'An unexpected error occurred while processing the request'
+        }), 500
+
+# Add a health check endpoint
+
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat()
+    }), 200
+
+# Add a graceful shutdown handler
+
+
+def shutdown_handler(signum, frame):
+    app.logger.info('Received shutdown signal, cleaning up...')
+    # Add any cleanup code here if needed
+    sys.exit(0)
 
 
 if __name__ == '__main__':
+    # Register shutdown handlers
+    signal.signal(signal.SIGTERM, shutdown_handler)
+    signal.signal(signal.SIGINT, shutdown_handler)
+
     # For development only
     app.run(host='0.0.0.0', port=5000, debug=False)
